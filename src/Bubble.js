@@ -17,6 +17,8 @@ var Bubble = Class(ui.SpriteView, function (supr){
 		supr(this, 'init', [opts]);
 
 		this.type = opts.type;
+		this.row = opts.row;
+		this.col = opts.col;
 	}
 
 });
