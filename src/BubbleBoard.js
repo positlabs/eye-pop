@@ -6,8 +6,9 @@ import src.Bubble as Bubble;
 import src.Shooter as Shooter;
 import math.array as math.array;
 import math.geom.Point as Point;
+import math.geom.Rect as Rect;
 import math.geom.Line as Line;
-
+import math.geom.intersect as intersect;
 
 
 /*
@@ -18,6 +19,12 @@ import math.geom.Line as Line;
 	=========
 
 	sound effects. make an audio controller module
+	redo eyeball sprites so they are trimmed and have feathered edges, 64px square
+
+	display score
+
+	trails behind thrown / falling eyeballs
+	explode popped eyeballs
 
 */
 
@@ -34,7 +41,6 @@ var bubbleLayout = [
 var numCols = bubbleLayout[0].length;
 
 var BubbleBoard = Class(ui.ImageView, function (supr) {
-
 	this.init = function(opts){
 
 		opts = merge(opts, {
@@ -162,13 +168,14 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 	var shooting = false;
 	this._onShoot = function(vector){
 		if(shooting) return; // only shoot one at a time
-		console.log('onShoot', vector.x, vector.y);
+		// console.log('onShoot', vector.x, vector.y);
 
 		shooting = true;
 		this.emit(BubbleBoard.SHOOT);
 
 		var _this = this;
 		var bubble = _this.bubbleQueue.shift();
+		if(!bubble) return;
 
 		var shootUpdateHandler = function(){
 			var speed = 20;
@@ -184,23 +191,41 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 			var hitCeiling = bubble.style.y <= 0;
 			var hitBubble = false;
 			var bubbleCenterPoint = new Point(bubble.style.x + _this.halfBubbleSize, bubble.style.y + _this.halfBubbleSize);
-			for(var i = _this.bubbles.length-1; i >= 0; i--){
+			for(var i = _this.bubbles.length - 1; i >= 0; i--){
 				var testBubble = _this.bubbles[i];
 				var distance = new Line(bubbleCenterPoint, new Point(testBubble.style.x + _this.halfBubbleSize, testBubble.style.y + _this.halfBubbleSize)).getLength();
-				if(distance <= _this.bubbleSize){
+				if(distance <= _this.bubbleSize * .9){ // .9 because approx 5% transparent pixel padding
 					hitBubble = true;
-					i = 0;
+					i = 0; // quit loop
 				}
 			}
 
 			if(hitCeiling || hitBubble){
-				// TODO: hit test cells and position the bubble
-				// TODO: add the bubble to the bubbles array
-				_this.bubbles.push(bubble);
+				//console.log('hitCeiling || hitBubble', hitCeiling || hitBubble)
+
+				// hit test cells and position the bubble
+				for(var c = _this.cells.length - 1; c >= 0; c--){
+					var cell = _this.cells[c];
+					var hitCell = intersect.pointAndRect(
+						// halfway to previous bubble center point. had to interpolate because bubble was popping into the next cell
+						new Point(bubble.style.x + _this.halfBubbleSize - (vector.x * speed * .5), bubble.style.y + _this.halfBubbleSize - (vector.y * speed * .5)), 
+						new Rect(cell.style.x, cell.style.y, cell.style.width, cell.style.height)
+					);
+					if(hitCell){
+						bubble.style.x = cell.style.x;
+						bubble.style.y = cell.style.y;
+						c = 0; // quit loop
+					}
+				}
+
+				bubble.lastPosition = new Point(bubble.style.x, bubble.style.y);
 				GC.app.engine.removeListener('Tick', shootUpdateHandler);
-				this.emit(BubbleBoard.HIT);
-				shooting = false;
+				_this.emit(BubbleBoard.HIT);
+				_this._evaluateBubbles();
+				_this.bubbles.push(bubble);
 				_this._loadNextBubble();
+				shooting = false;
+
 			}
 
 		}
@@ -209,8 +234,11 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 	};
 
 	this._evaluateBubbles = function(thrownBubble){
+
 		// TODO: evaluate if bubbles should be popped.
 		// only eval chain of same-color bubbles that are touching thrownBubble
+
+		// TODO: evaluate if bubbles should be dropped.
 	};
 
 });
