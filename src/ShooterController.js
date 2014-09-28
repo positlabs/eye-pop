@@ -14,7 +14,7 @@ from event.input.dispatch import eventTypes;
 
 */
 
-var Shooter = Class(ui.View, function (supr){
+var ShooterController = Class(ui.View, function (supr){
 
 	this.init = function(opts){
 
@@ -47,11 +47,11 @@ var Shooter = Class(ui.View, function (supr){
 		// console.log('onInputSelect', point);
 		var diff = point.subtract(this.originPoint);
 		var vector = diff.normalize(new Point(0, 0));
-		this.emit(Shooter.SHOOT, vector);
+		this.emit(ShooterController.SHOOT, vector);
 	}
 
 });
 
-Shooter.SHOOT = 'Shooter.SHOOT';
+ShooterController.SHOOT = 'ShooterController.SHOOT';
 
-exports = Shooter;
+exports = ShooterController;

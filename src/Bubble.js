@@ -1,21 +1,24 @@
-// import ui.View;
-import ui.ImageView;
+import ui.View;
 import ui.SpriteView
 import device;
+import animate;
 
-var Bubble = Class(ui.SpriteView, function (supr){
+var Bubble = Class(ui.View, function (supr){
 
 	this.init = function(opts){
 		// console.log('Bubble.init', opts);
 
-		opts = merge(opts, {
-			url: 'resources/images/eyeballs/' + opts.type.charAt(opts.type.length-1).toLowerCase(),
+		supr(this, 'init', [opts]);
+
+		this.eyeAnim = new ui.SpriteView({
+			superview: this,
+			width: opts.width,
+			height: opts.height,
+			url: 'resources/images/eyeballs/' + opts.type.charAt(opts.type.length - 1).toLowerCase(),
 			frameRate: 18 + Math.round(Math.random() * 12),
 			autoStart: true,
 			delay: Math.random() * 20000 + 5000
 		});
-
-		supr(this, 'init', [opts]);
 
 		this.type = opts.type;
 		this.row = opts.row;
@@ -25,10 +28,49 @@ var Bubble = Class(ui.SpriteView, function (supr){
 	};
 
 	this.pop = function(){
-		console.log('Bubble.pop');
-		//TODO: play explosion animation
+		// console.log('Bubble.pop');
+		var _this = this;
+		var bigSize = this.eyeAnim.style.width * 1.5;
+		animate(this.eyeAnim).now({
+			width: bigSize,
+			height: bigSize,
+			x: -bigSize * .25,
+			y: -bigSize * .25,
+		}, 200, animate.easeOut).then(function(){
+			_this.eyeAnim.stopAnimation();
+		});
 
-		this.emit(Bubble.POPPED);
+		console.log(this.eyeAnim.style.width);
+
+		var explosion = new ui.SpriteView({
+			superview: this,
+			width: 64,
+			height: 64,
+			x: this.eyeAnim.style.width * .5 - 32,
+			y: this.eyeAnim.style.height * .5 - 32,
+			sheetData: {
+				url: 'resources/images/explosion_anim.png',
+				anims: {
+					explode:  [
+						[0, 0], [1, 0], [2, 0], [3, 0],
+						[0, 1], [1, 1], [2, 1], [3, 1],
+						[0, 2], [1, 2], [2, 2], [3, 2],
+						[0, 3], [1, 3], [2, 3], [3, 3],
+					],
+				}
+			}
+		});
+
+		var _this = this;
+		setTimeout(function(){
+			explosion.startAnimation('explode', {
+				callback: function(){
+					_this.emit(Bubble.POPPED);
+					GC.app.emit(Bubble.POPPED);
+				}
+			});
+		}, Math.random() * 300);
+
 	};
 
 	this.equals = function(otherBubble){

@@ -1,5 +1,6 @@
 import ui.TextView as TextView;
 import src.BubbleBoard as BubbleBoard;
+import src.SoundController as SoundController;
 
 exports = Class(GC.Application, function () {
 
@@ -8,6 +9,8 @@ exports = Class(GC.Application, function () {
 		var board = new BubbleBoard({
 			superview: this
 		});
+
+		SoundController.init();
 
 	};
 

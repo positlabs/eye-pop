@@ -3,7 +3,7 @@ import ui.ImageView;
 import device;
 import animate;
 import src.Bubble as Bubble;
-import src.Shooter as Shooter;
+import src.ShooterController as Shooter;
 import math.array as math.array;
 import math.geom.Point as Point;
 import math.geom.Rect as Rect;
@@ -23,7 +23,6 @@ import math.geom.intersect as intersect;
 	display score
 
 	trails behind thrown / falling eyeballs
-	explode popped eyeballs
 
 */
 
@@ -38,9 +37,9 @@ var A = Bubble.A,
 var bubbleLayout = [
 	[A, A, A, A, A, A, A, A, A, A],
 	  [B, B, B, B, B, B, B, B, B],
-	[0, C, C, C, C, C, C, C, C, 0],
-	  [0, D, D, D, D, D, D, D, 0],
-	[0, 0, A, A, A, A, A, A, 0, 0],
+	[0, C, C, C, 0, 0, C, C, C, 0],
+	  [0, D, D, 0, 0, 0, D, D, 0],
+	[0, 0, A, A, 0, 0, A, A, 0, 0],
 	  [0, 0, B, B, B, B, B, 0, 0],
 	[0, 0, 0, C, C, C, C, 0, 0, 0],
 ];
@@ -142,11 +141,8 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		shooter.on(Shooter.SHOOT, this._onShoot);
 
 		// START THE GAME!
-		// setTimeout(function(){
-			_this._loadNextBubble(); // fill the hopper
-			_this._loadNextBubble();
-		// }, 3000);
-
+		_this._loadNextBubble(); // fill the hopper
+		_this._loadNextBubble();
 	}
 
 	// "private" methods
@@ -194,7 +190,7 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		// console.log('onShoot', vector.x, vector.y);
 
 		shooting = true;
-		this.emit(BubbleBoard.SHOOT); // TODO: probably global event
+		GC.app.emit(BubbleBoard.SHOOT);
 
 		var _this = this;
 		var bubble = _this.bubbleQueue.shift();
@@ -247,7 +243,7 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 				bubble.lastPosition = new Point(bubble.style.x, bubble.style.y);
 
 				GC.app.engine.removeListener('Tick', shootUpdateHandler);
-				_this.emit(BubbleBoard.HIT); // TODO: probably global event
+				GC.app.emit(BubbleBoard.HIT);
 				_this.bubbles.push(bubble);
 				_this._evaluateBubbles(bubble);
 				_this._loadNextBubble();
@@ -357,7 +353,6 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 			[bubble.col + rowOffset, bubble.row + 1], // other bottom
 			[bubble.col + rowOffset, bubble.row - 1], // other top
 		];
-		// console.log(bubble.col, bubble.row);
 
 		var connectedMatchBubbles = [];
 		for(var i = bubbleSubset.length - 1; i >= 0; i--){
@@ -370,53 +365,6 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 				}
 			}
 		}
-
-
-		// var testPoints = [
-		// 	new Point(bubble.style.x - this.bubbleSize + this.halfBubbleSize, bubble.style.y + this.halfBubbleSize), // left
-		// 	new Point(bubble.style.x + this.bubbleSize + this.halfBubbleSize, bubble.style.y + this.halfBubbleSize), // right
-		// 	new Point(bubble.style.x - this.halfBubbleSize + this.halfBubbleSize, bubble.style.y - this.bubbleSize + this.halfBubbleSize), // top left
-		// 	new Point(bubble.style.x + this.halfBubbleSize + this.halfBubbleSize, bubble.style.y - this.bubbleSize + this.halfBubbleSize), // top right
-		// 	new Point(bubble.style.x - this.halfBubbleSize + this.halfBubbleSize, bubble.style.y + this.bubbleSize + this.halfBubbleSize), // bottom left
-		// 	new Point(bubble.style.x + this.halfBubbleSize + this.halfBubbleSize, bubble.style.y + this.bubbleSize + this.halfBubbleSize), // bottom right
-		// ];
-		// var connectedMatchBubbles = [];
-		// for(var i = bubbleSubset.length - 1; i >= 0; i--){
-		// 	var testBubble = bubbleSubset[i];
-		// 	var isConnected = false;
-		// 	for(var tpi = testPoints.length - 1; tpi >= 0; tpi--){
-		// 		var testPoint = testPoints[tpi];
-
-		// 		if(intersect.pointAndRect(testPoint, new Rect(testBubble.style.x, testBubble.style.y, _this.bubbleSize, _this.bubbleSize))){
-		// 			tpi = 0;
-		// 			connectedMatchBubbles.push(testBubble);
-		// 		}
-		// 	}
-		// }
-
-
-		// var connectedMatchBubbles = [];
-		// for(var i = bubbleSubset.length - 1; i >= 0; i--){
-		// 	var testBubble = bubbleSubset[i];
-
-		// 	var isTypeMatch = bubble.type == testBubble.type;
-		// 	if(isTypeMatch){
-
-		// 		var isConnected = false;
-		// 		for(var tpi = testPoints.length - 1; tpi >= 0; tpi--){
-		// 			var testPoint = testPoints[tpi];
-		// 			if(testPoint.x == testBubble.style.x && testPoint.y == testBubble.style.y){
-		// 				isConnected = true;
-		// 				tpi = 0;
-		// 			}
-		// 		}
-
-		// 		if(isTypeMatch && isConnected){
-		// 			connectedMatchBubbles.push(testBubble);
-		// 		}
-		// 	}
-		// }
-
 
 		return connectedMatchBubbles;
 	};
