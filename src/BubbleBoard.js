@@ -10,7 +10,6 @@ import math.geom.Rect as Rect;
 import math.geom.Line as Line;
 import math.geom.intersect as intersect;
 
-
 /*
 
 	handles all the bubbles
@@ -33,11 +32,21 @@ var A = Bubble.A,
  	C = Bubble.C,
  	D = Bubble.D;
 var bubbleLayout = [
-	[D, A, B, B, A, D, B, A, A, A],
-	  [B, D, B, C, A, C, A, B, C],
-	[0, 0, C, D, B, 0, 0, B, B, 0],
-	  [0, 0, B, 0, 0, 0, 0, B, 0],
+	[A, A, A, A, A, A, A, A, A, A],
+	  [B, B, B, B, B, B, B, B, B],
+	[0, C, C, C, C, C, C, C, C, 0],
+	  [0, D, D, D, D, D, D, D, 0],
+	[0, 0, A, A, A, A, A, A, 0, 0],
+	  [0, 0, B, B, B, B, B, 0, 0],
+	[0, 0, 0, C, C, C, C, 0, 0, 0],
 ];
+// var bubbleLayout = [
+// 	[A, 0, B, 0, C, 0, D, 0, A, 0],
+// 	  [A, 0, B, 0, C, 0, D, 0, A],
+// 	[A, 0, B, 0, C, 0, D, 0, A, 0],
+// 	  [A, 0, B, 0, C, 0, D, 0, A],
+// 	[A, 0, B, 0, C, 0, D, 0, A, 0],
+// ];
 var numCols = bubbleLayout[0].length;
 
 var BubbleBoard = Class(ui.ImageView, function (supr) {
@@ -52,6 +61,8 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		supr(this, 'init', [opts]); // note: need to call supr BEFORE adding children
 
 		this._onShoot = bind(this, this._onShoot);
+		this._evaluateBubbles = bind(this, this._evaluateBubbles);
+		this._getConnectedMatchingBubbles = bind(this, this._getConnectedMatchingBubbles);
 
 		var _this = this;
 
@@ -86,6 +97,7 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 				var bubbleRow = bubbleLayout[rowNum];
 				if(bubbleRow){
 					var bubbleType = bubbleRow[colNum];
+					// if(bubbleType == undefined)throw Error('bubbleType is undefined!')
 					if(bubbleType){
 						var bubble = new Bubble({
 							superview: _this,
@@ -124,10 +136,10 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		shooter.on(Shooter.SHOOT, this._onShoot);
 
 		// START THE GAME!
-		setTimeout(function(){
+		// setTimeout(function(){
 			_this._loadNextBubble(); // fill the hopper
 			_this._loadNextBubble();
-		}, 3000);
+		// }, 3000);
 
 	}
 
@@ -146,6 +158,11 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 			bubbleTypes.push(type);
 		}
 		var bubbleType = math.array.shuffle(bubbleTypes)[0];
+
+		if(bubbleType == undefined){
+			//TODO: handle the end of the game!
+			return;
+		}
 
 		this.bubbleQueue.push(
 			new Bubble({
@@ -171,7 +188,7 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		// console.log('onShoot', vector.x, vector.y);
 
 		shooting = true;
-		this.emit(BubbleBoard.SHOOT);
+		this.emit(BubbleBoard.SHOOT); // TODO: probably global event
 
 		var _this = this;
 		var bubble = _this.bubbleQueue.shift();
@@ -219,10 +236,11 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 				}
 
 				bubble.lastPosition = new Point(bubble.style.x, bubble.style.y);
+
 				GC.app.engine.removeListener('Tick', shootUpdateHandler);
-				_this.emit(BubbleBoard.HIT);
-				_this._evaluateBubbles();
+				_this.emit(BubbleBoard.HIT); // TODO: probably global event
 				_this.bubbles.push(bubble);
+				_this._evaluateBubbles(bubble);
 				_this._loadNextBubble();
 				shooting = false;
 
@@ -234,11 +252,132 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 	};
 
 	this._evaluateBubbles = function(thrownBubble){
+		var _this = this;
 
-		// TODO: evaluate if bubbles should be popped.
 		// only eval chain of same-color bubbles that are touching thrownBubble
+		var matches = this._getAllConnectedMatchingBubbles(thrownBubble);
+		console.log('matched', matches.length);
+
+		// more than 2? pop!
+		if(matches.length > 2){
+			matches.forEach(function(bubble){
+				bubble.once(Bubble.POPPED, function(){
+					var bubbleIndex = _this.bubbles.indexOf(bubble)
+					if(bubbleIndex > -1){ // not sure how, but sometimes bubbles have already been removed
+						_this.bubbles.splice(bubbleIndex, 1);
+					}
+					_this.removeSubview(bubble);
+				});
+				bubble.pop();
+
+			});
+		}
 
 		// TODO: evaluate if bubbles should be dropped.
+	};
+
+	/**
+		@return: Array of connected bubbles of the same color.
+	*/
+	this._getAllConnectedMatchingBubbles = function(bubble){
+		var _this = this;
+
+		// only need to test against bubbles of same type
+		var colorMatchedBubbles = this._getBubblesOfType(bubble.type);
+		// colorMatchedBubbles.splice(colorMatchedBubbles.indexOf(bubble), 1); // rm target bubble since we know it's a match
+
+		var allMatches = [];
+		var matchesToTest = [bubble];
+		var searching = true;
+		while(searching){
+
+			var newMatches = [];
+			matchesToTest.forEach(function(testBubble){
+				// remove bubbles from colorMatchedBubbles if they have been matched
+				colorMatchedBubbles.splice(colorMatchedBubbles.indexOf(testBubble), 1);
+				var _matches = _this._getNearMatches(testBubble, colorMatchedBubbles);
+				newMatches = newMatches.concat(_matches);
+			});
+
+			allMatches = allMatches.concat(matchesToTest);
+			matchesToTest = newMatches.concat([]);
+
+			if(newMatches.length == 0) searching = false;
+
+		}
+
+		// allMatches.splice(allMatches.indexOf(bubble), 1); // rm target bubble since we know it's a match
+
+
+		return allMatches;
+	}
+
+	this._getBubblesOfType = function(bubbleType){
+
+		var matches = [];
+		for(var i = this.bubbles.length - 1; i >= 0; i--){
+			var testBubble = this.bubbles[i];
+			if(testBubble.type == bubbleType) matches.push(testBubble);
+		}
+		return matches;
+	}
+
+	/**
+		@return: Array of matched bubbles surrounding the target bubble
+	*/
+	this._getNearMatches = function(bubble, bubbleSubset){
+
+		// note: hit testing might be simpler, but less performant.
+		var _this = this;
+
+		var testPoints = [
+			new Point(bubble.style.x - this.bubbleSize + this.halfBubbleSize, bubble.style.y + this.halfBubbleSize), // left
+			new Point(bubble.style.x + this.bubbleSize + this.halfBubbleSize, bubble.style.y + this.halfBubbleSize), // right
+			new Point(bubble.style.x - this.halfBubbleSize + this.halfBubbleSize, bubble.style.y - this.bubbleSize + this.halfBubbleSize), // top left
+			new Point(bubble.style.x + this.halfBubbleSize + this.halfBubbleSize, bubble.style.y - this.bubbleSize + this.halfBubbleSize), // top right
+			new Point(bubble.style.x - this.halfBubbleSize + this.halfBubbleSize, bubble.style.y + this.bubbleSize + this.halfBubbleSize), // bottom left
+			new Point(bubble.style.x + this.halfBubbleSize + this.halfBubbleSize, bubble.style.y + this.bubbleSize + this.halfBubbleSize), // bottom right
+		];
+
+		var connectedMatchBubbles = [];
+		for(var i = bubbleSubset.length - 1; i >= 0; i--){
+			var testBubble = bubbleSubset[i];
+			var isConnected = false;
+			for(var tpi = testPoints.length - 1; tpi >= 0; tpi--){
+				var testPoint = testPoints[tpi];
+
+				if(intersect.pointAndRect(testPoint, new Rect(testBubble.style.x, testBubble.style.y, _this.bubbleSize, _this.bubbleSize))){
+					tpi = 0;
+					connectedMatchBubbles.push(testBubble);
+				}
+			}
+		}
+
+
+		// var connectedMatchBubbles = [];
+		// for(var i = bubbleSubset.length - 1; i >= 0; i--){
+		// 	var testBubble = bubbleSubset[i];
+
+		// 	var isTypeMatch = bubble.type == testBubble.type;
+		// 	if(isTypeMatch){
+
+		// 		var isConnected = false;
+		// 		for(var tpi = testPoints.length - 1; tpi >= 0; tpi--){
+		// 			var testPoint = testPoints[tpi];
+		// 			if(testPoint.x == testBubble.style.x && testPoint.y == testBubble.style.y){
+		// 				isConnected = true;
+		// 				tpi = 0;
+		// 			}
+		// 		}
+
+		// 		if(isTypeMatch && isConnected){
+		// 			connectedMatchBubbles.push(testBubble);
+		// 		}
+		// 	}
+		// }
+
+
+		return connectedMatchBubbles;
 	};
 
 });
