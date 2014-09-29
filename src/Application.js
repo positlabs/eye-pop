@@ -6,9 +6,7 @@ exports = Class(GC.Application, function () {
 
 	this.initUI = function () {
 
-		var board = new BubbleBoard({
-			superview: this
-		});
+		var board = new BubbleBoard({superview: this});
 
 		SoundController.init();
 

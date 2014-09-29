@@ -2,6 +2,7 @@ import ui.View;
 import ui.SpriteView
 import device;
 import animate;
+from ui.filter import LinearAddFilter;
 
 var Bubble = Class(ui.View, function (supr){
 
@@ -30,15 +31,21 @@ var Bubble = Class(ui.View, function (supr){
 	this.pop = function(){
 		// console.log('Bubble.pop');
 		var _this = this;
+		var addFilter = new LinearAddFilter({r:255, g:255, b: 255, a:.7});
+		this.eyeAnim.setFilter(addFilter);
+
 		var bigSize = this.eyeAnim.style.width * 1.5;
-		animate(this.eyeAnim).now({
-			width: bigSize,
-			height: bigSize,
-			x: -bigSize * .25,
-			y: -bigSize * .25,
-		}, 200, animate.easeOut).then(function(){
-			_this.eyeAnim.stopAnimation();
-		});
+		animate(this.eyeAnim)
+			.now({
+				width: bigSize,
+				height: bigSize,
+				x: -bigSize * .25,
+				y: -bigSize * .25,
+			}, 200, animate.easeOut)
+			.then(function(){
+				_this.eyeAnim.stopAnimation();
+			});
+
 
 		var explosion = new ui.SpriteView({
 			superview: this,
@@ -67,7 +74,7 @@ var Bubble = Class(ui.View, function (supr){
 					GC.app.emit(Bubble.POPPED);
 				}
 			});
-		}, Math.random() * 300);
+		}, Math.random() * 300 + 100);
 
 	};
 

@@ -9,6 +9,7 @@ import math.geom.Point as Point;
 import math.geom.Rect as Rect;
 import math.geom.Line as Line;
 import math.geom.intersect as intersect;
+import math.array as array;
 
 /*
 
@@ -24,54 +25,47 @@ import math.geom.intersect as intersect;
 
 	trails behind thrown / falling eyeballs
 
-	handle end of round
-
 */
 
 var A = Bubble.A,
  	B = Bubble.B,
  	C = Bubble.C,
  	D = Bubble.D;
-// var bubbleLayout = [
-// 	[A, A, A, A, A, A, A, A, A, A],
-// 	  [0, 0, A, A, A, A, A, A, 0],
-// ];
-// var bubbleLayout = [
-// 	[A, A, A, A, A, A, A, A, A, A],
-// 	  [B, B, B, B, B, B, B, B, B],
-// 	[0, C, C, C, 0, 0, C, C, C, 0],
-// 	  [0, D, D, 0, 0, 0, D, D, 0],
-// 	[0, 0, A, A, 0, 0, A, A, 0, 0],
-// 	  [0, 0, B, B, B, B, B, 0, 0],
-// 	[0, 0, 0, C, C, C, C, 0, 0, 0],
-// ];
-var bubbleLayout = [
-	[0, 0, A, A, A, A, A, A, 0, 0],
-	  [0, 0, B, B, B, B, B, 0, 0],
-	[0, 0, 0, C, C, C, C, C, 0, 0],
-	  [0, 0, D, D, D, D, D, 0, 0],
-	[0, 0, 0, A, A, A, A, A, 0, 0],
-	  [0, 0, B, B, B, B, B, 0, 0],
-	[0, 0, 0, C, C, C, C, 0, 0, 0],
-];
-// var bubbleLayout = [
-// 	[A, 0, B, 0, C, 0, D, 0, A, 0],
-// 	  [A, 0, B, 0, C, 0, D, 0, A],
-// 	[A, 0, B, 0, C, 0, D, 0, A, 0],
-// 	  [A, 0, B, 0, C, 0, D, 0, A],
-// 	[A, 0, B, 0, C, 0, D, 0, A, 0],
-// ];
 
-// var bubbleLayout = [
-// 	[A, 0, 0, 0, C, 0, D, 0, 0, 0],
-// 	  [A, 0, 0, 0, C, 0, D, 0, 0],
-// 	[B, 0, 0, 0, B, 0, C, 0, 0, 0],
-// 	  [C, 0, 0, 0, A, 0, C, 0, 0],
-// ];
-var numCols = bubbleLayout[0].length;
+var bubbleLayouts = [
+	[
+		[A, A, A, A, A, A, A, A, A, A],
+		  [B, B, B, B, B, B, B, B, B],
+		[0, C, C, C, 0, 0, C, C, C, 0],
+		  [0, D, D, 0, 0, 0, D, D, 0],
+		[0, 0, A, A, 0, 0, A, A, 0, 0],
+		  [0, 0, B, B, B, B, B, 0, 0],
+		[0, 0, 0, C, C, C, C, 0, 0, 0],
+	],
+	[
+		[0, 0, A, A, A, A, A, A, 0, 0],
+		  [0, 0, B, B, B, B, B, 0, 0],
+		[0, 0, 0, C, C, C, C, C, 0, 0],
+		  [0, 0, D, D, D, D, D, 0, 0],
+		[0, 0, 0, A, A, A, A, A, 0, 0],
+		  [0, 0, B, B, B, B, B, 0, 0],
+		[0, 0, 0, C, C, C, C, 0, 0, 0],
+	],
+	[
+		[A, 0, A, A, A, A, A, 0, 0, 0],
+		  [B, 0, B, 0, 0, B, B, 0, 0],
+		[0, C, 0, C, C, 0, C, 0, 0, 0],
+		  [0, D, 0, D, 0, D, 0, 0, 0],
+		[0, 0, A, 0, 0, B, 0, 0, 0, 0],
+		  [0, 0, B, 0, A, 0, 0, 0, 0],
+		[0, 0, 0, C, D, 0, 0, 0, 0, 0],
+	]
+];
 
 var BubbleBoard = Class(ui.ImageView, function (supr) {
+
 	this.init = function(opts){
+		console.log('init');
 
 		opts = merge(opts, {
 			image: 'resources/images/bg.jpg',
@@ -85,8 +79,22 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		this._evaluateBubbles = bind(this, this._evaluateBubbles);
 		this._getConnectedMatchingBubbles = bind(this, this._getConnectedMatchingBubbles);
 
+		this._setupBoard();
+
+		var shooter = new Shooter({
+			superview: this,
+			originPoint: new Point(device.width * .5, device.height - this.bubbleSize * 1.5)
+		});
+		shooter.on(Shooter.SHOOT, this._onShoot);
+	};
+
+	this._setupBoard = function(){
+		console.log('_setupBoard');
+
 		var _this = this;
 
+		var bubbleLayout = array.shuffle(bubbleLayouts)[0];
+		var numCols = bubbleLayout[0].length;
 		this.bubbleSize = device.width / numCols;
 		this.halfBubbleSize = this.bubbleSize * .5;
 
@@ -98,7 +106,7 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 			var rowNum = Math.floor(i / numCols);
 			var colNum = i % numCols;
 			var isOddRow = Math.floor(rowNum * .5) != rowNum * .5;
-			var isLastColumn = colNum == (numCols-1);
+			var isLastColumn = colNum == (numCols - 1);
 
 			if(isOddRow && isLastColumn){
 				// skip last cell on odd rows
@@ -110,7 +118,9 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 					width: this.bubbleSize,
 					height: this.bubbleSize,
 					x: colNum * this.bubbleSize + rowOffset,
-					y: rowNum * this.bubbleSize
+					y: rowNum * this.bubbleSize,
+					canHandleEvents: false,
+					tag: 'cell'
 				});
 				cell.col = colNum;
 				cell.row = rowNum;
@@ -120,7 +130,6 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 				var bubbleRow = bubbleLayout[rowNum];
 				if(bubbleRow){
 					var bubbleType = bubbleRow[colNum];
-					// if(bubbleType == undefined)throw Error('bubbleType is undefined!')
 					if(bubbleType){
 						var bubble = new Bubble({
 							superview: _this,
@@ -152,21 +161,29 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 				.then({x:origX, y:origY}, Math.random() * 2000, animate.easeOut);
 		});
 
-		var shooter = new Shooter({
-			superview: this,
-			originPoint: new Point(device.width * .5, device.height - this.bubbleSize * 1.5)
-		});
-		shooter.on(Shooter.SHOOT, this._onShoot);
-
 		// START THE GAME!
-		_this._loadNextBubble(); // fill the hopper
-		_this._loadNextBubble();
+		// fill the hopper
+		while(this.bubbleQueue.length < 2){
+			this._loadNextBubble();
+		}
+
+	};
+
+	this._cleanup = function(){
+		console.log('_cleanup');
+		// trash all cells on the board
+		var _this = this;
+		this.cells.forEach(function(cell){
+			_this.removeSubview(cell);
+		});
+		this.cells = [];
 	}
 
 	// "private" methods
 
 	this.bubbleQueue = [];
 	this._loadNextBubble = function(){
+		// console.log('_loadNextBubble');
 
 		// get a random bubble from types on the board
 		var bubbleTypeSet = {};
@@ -178,11 +195,9 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 			bubbleTypes.push(type);
 		}
 		var bubbleType = math.array.shuffle(bubbleTypes)[0];
+		console.log(bubbleType);
 
-		if(bubbleType == undefined){
-			//TODO: handle the end of the game!
-			return;
-		}
+		if(bubbleType == undefined)return; // round is over
 
 		this.bubbleQueue.push(
 			new Bubble({
@@ -196,8 +211,9 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		);
 		var _this = this;
 		setTimeout(function(){
-			animate(_this.bubbleQueue[1]).now({y:device.height - _this.halfBubbleSize});
 			animate(_this.bubbleQueue[0]).now({y:device.height - _this.bubbleSize * 1.5});
+			if(_this.bubbleQueue.length > 1)
+				animate(_this.bubbleQueue[1]).now({y:device.height - _this.halfBubbleSize});
 		}, 100);
 
 	};
@@ -279,7 +295,6 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 
 		// only eval chain of same-color bubbles that are touching thrownBubble
 		var matches = this._getAllConnectedMatchingBubbles(thrownBubble);
-		console.log('matched', matches.length);
 
 		// more than 2? pop!
 		if(matches.length > 2){
@@ -295,35 +310,17 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		}
 		setTimeout(function(){
 			_this._dropBubbles();
+			setTimeout(function(){
+				if(_this.bubbles.length == 0){
+					// _this.emit(BubbleBoard.ROUND_OVER);
+					_this._cleanup();
+					_this._setupBoard();
+				}
+			}, 600);
 		}, 300);
 
 	};
 
-
-
-
-
-
-
-
-
-
-
-
-	// FIXME: only half of bubbles are dropping...
-
-
-
-
-
-
-
-
-
-
-
-
-	// determine if bubbles should be dropped
 	this._dropBubbles = function(){
 		var _this = this;
 
@@ -479,5 +476,6 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 
 BubbleBoard.HIT = 'BubbleBoard.HIT';
 BubbleBoard.SHOOT = 'BubbleBoard.SHOOT';
+BubbleBoard.ROUND_OVER = 'BubbleBoard.ROUND_OVER';
 
 exports = BubbleBoard;
