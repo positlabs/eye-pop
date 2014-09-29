@@ -40,8 +40,6 @@ var Bubble = Class(ui.View, function (supr){
 			_this.eyeAnim.stopAnimation();
 		});
 
-		console.log(this.eyeAnim.style.width);
-
 		var explosion = new ui.SpriteView({
 			superview: this,
 			width: 64,
@@ -71,6 +69,13 @@ var Bubble = Class(ui.View, function (supr){
 			});
 		}, Math.random() * 300);
 
+	};
+
+	this.drop = function(){
+		var _this = this;
+		animate(this).now({y: this.style.y + Math.random() * 200}, 500, animate.easeIn).then(function(){
+			_this.pop();
+		});
 	};
 
 	this.equals = function(otherBubble){

@@ -21,7 +21,6 @@ exports = {
 	init: function(){
 		GC.app.on(BubbleBoard.HIT, function(){});
 		GC.app.on(Bubble.POPPED, function(){
-			console.log('BUBBLE.POPPED');
 			// audiomanager.play('explode');
 		});
 		audiomanager.play('bg');

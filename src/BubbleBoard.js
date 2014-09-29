@@ -17,12 +17,14 @@ import math.geom.intersect as intersect;
 	TODOs
 	=========
 
-	sound effects. make an audio controller module
+	sound effects.
 	redo eyeball sprites so they are trimmed and have feathered edges, 64px square
 
 	display score
 
 	trails behind thrown / falling eyeballs
+
+	handle end of round
 
 */
 
@@ -34,12 +36,21 @@ var A = Bubble.A,
 // 	[A, A, A, A, A, A, A, A, A, A],
 // 	  [0, 0, A, A, A, A, A, A, 0],
 // ];
+// var bubbleLayout = [
+// 	[A, A, A, A, A, A, A, A, A, A],
+// 	  [B, B, B, B, B, B, B, B, B],
+// 	[0, C, C, C, 0, 0, C, C, C, 0],
+// 	  [0, D, D, 0, 0, 0, D, D, 0],
+// 	[0, 0, A, A, 0, 0, A, A, 0, 0],
+// 	  [0, 0, B, B, B, B, B, 0, 0],
+// 	[0, 0, 0, C, C, C, C, 0, 0, 0],
+// ];
 var bubbleLayout = [
-	[A, A, A, A, A, A, A, A, A, A],
-	  [B, B, B, B, B, B, B, B, B],
-	[0, C, C, C, 0, 0, C, C, C, 0],
-	  [0, D, D, 0, 0, 0, D, D, 0],
-	[0, 0, A, A, 0, 0, A, A, 0, 0],
+	[0, 0, A, A, A, A, A, A, 0, 0],
+	  [0, 0, B, B, B, B, B, 0, 0],
+	[0, 0, 0, C, C, C, C, C, 0, 0],
+	  [0, 0, D, D, D, D, D, 0, 0],
+	[0, 0, 0, A, A, A, A, A, 0, 0],
 	  [0, 0, B, B, B, B, B, 0, 0],
 	[0, 0, 0, C, C, C, C, 0, 0, 0],
 ];
@@ -49,6 +60,13 @@ var bubbleLayout = [
 // 	[A, 0, B, 0, C, 0, D, 0, A, 0],
 // 	  [A, 0, B, 0, C, 0, D, 0, A],
 // 	[A, 0, B, 0, C, 0, D, 0, A, 0],
+// ];
+
+// var bubbleLayout = [
+// 	[A, 0, 0, 0, C, 0, D, 0, 0, 0],
+// 	  [A, 0, 0, 0, C, 0, D, 0, 0],
+// 	[B, 0, 0, 0, B, 0, C, 0, 0, 0],
+// 	  [C, 0, 0, 0, A, 0, C, 0, 0],
 // ];
 var numCols = bubbleLayout[0].length;
 
@@ -266,19 +284,98 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		// more than 2? pop!
 		if(matches.length > 2){
 			matches.forEach(function(bubble){
+				var bubbleIndex = _this.bubbles.indexOf(bubble)
+				_this.bubbles.splice(bubbleIndex, 1);
+
 				bubble.once(Bubble.POPPED, function(){
-					var bubbleIndex = _this.bubbles.indexOf(bubble)
-					if(bubbleIndex > -1){ // not sure how, but sometimes bubbles have already been removed
-						_this.bubbles.splice(bubbleIndex, 1);
-						_this.removeSubview(bubble);
-					}
+					_this.removeSubview(bubble);
 				});
 				bubble.pop();
-
 			});
 		}
+		setTimeout(function(){
+			_this._dropBubbles();
+		}, 300);
 
-		// TODO: evaluate if bubbles should be dropped.
+	};
+
+
+
+
+
+
+
+
+
+
+
+
+	// FIXME: only half of bubbles are dropping...
+
+
+
+
+
+
+
+
+
+
+
+
+	// determine if bubbles should be dropped
+	this._dropBubbles = function(){
+		var _this = this;
+
+		// invalidate the flag
+		this.bubbles.forEach(function(bubble){
+			bubble.checked = false;
+			bubble.isConnectedToCeiling = false;
+		});
+
+		var ceilBubbles = this._getBubblesByRow(0);
+		ceilBubbles.forEach(function(bubble){ bubble.isConnectedToCeiling = true; });
+
+		var nextBubbles = getNextBubblesFrom(ceilBubbles);
+		while(nextBubbles.length > 0){
+			nextBubbles = getNextBubblesFrom(nextBubbles);
+		}
+
+		// drop all bubbles that don't have the isConnectedToCeiling flag
+		// concat because forEach doesn't like when we splice
+		this.bubbles.concat([])
+			.forEach(function(bubble){
+			if(!bubble.isConnectedToCeiling){
+				var bubbleIndex = _this.bubbles.indexOf(bubble);
+				_this.bubbles.splice(bubbleIndex, 1);
+				bubble.once(Bubble.POPPED, function(){
+					_this.removeSubview(bubble);
+				});
+
+				bubble.drop();
+			}
+		});
+
+		function getNextBubblesFrom (bubblesToCheck){
+
+			var nextBubblesSet = {};
+			var nextBubblesArray = [];
+			bubblesToCheck.forEach(function(bubbleToCheck){
+				var nextbubblesToCheck = _this._getNearMatches(bubbleToCheck);
+				nextbubblesToCheck.forEach(function(bubble){
+					if(!bubble.isConnectedToCeiling){ // already tested this bubble
+						bubble.isConnectedToCeiling = true;
+						nextBubblesSet[bubble.col + '-' + bubble.row] = bubble;
+					}
+				});
+			});
+			for(var bubbleKey in nextBubblesSet){
+				nextBubblesArray.push(nextBubblesSet[bubbleKey]);
+			}
+
+			return nextBubblesArray;
+		}
+
 	};
 
 	/**
@@ -292,8 +389,7 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 
 		var allMatches = [];
 		var matchesToTest = [bubble];
-		var searching = true;
-		while(searching){
+		while(matchesToTest.length > 0){
 
 			// using a set as a convenient way to ignore dupes
 			var newMatchesSet = {};
@@ -318,13 +414,18 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 
 			allMatches = allMatches.concat(matchesToTest);
 			matchesToTest = newMatchesArray;
-
-			if(newMatchesArray.length == 0) searching = false;
-
 		}
 
 		return allMatches;
 	}
+
+	this._getBubblesByRow = function(rowNum){
+		var matches = [];
+		this.bubbles.forEach(function(bubble){
+			if(bubble.row == rowNum)matches.push(bubble);
+		});
+		return matches;
+	};
 
 	this._getBubblesOfType = function(bubbleType){
 
@@ -340,19 +441,11 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		@return: Array of matched bubbles surrounding the target bubble
 	*/
 	this._getNearMatches = function(bubble, bubbleSubset){
+		bubbleSubset = bubbleSubset || this.bubbles;
 
 		var _this = this;
 
-		var isOddRow = bubble.row * .5 != Math.round(bubble.row * .5);
-		var rowOffset = isOddRow ? 1 : -1;
-		var testCoords = [
-			[bubble.col - 1, bubble.row], // left
-			[bubble.col + 1, bubble.row], // right
-			[bubble.col, bubble.row - 1], // top
-			[bubble.col, bubble.row + 1], // bottom
-			[bubble.col + rowOffset, bubble.row + 1], // other bottom
-			[bubble.col + rowOffset, bubble.row - 1], // other top
-		];
+		var testCoords = this._getTestCoords(bubble);
 
 		var connectedMatchBubbles = [];
 		for(var i = bubbleSubset.length - 1; i >= 0; i--){
@@ -367,6 +460,19 @@ var BubbleBoard = Class(ui.ImageView, function (supr) {
 		}
 
 		return connectedMatchBubbles;
+	};
+
+	this._getTestCoords = function(bubble){
+		var isOddRow = bubble.row * .5 != Math.round(bubble.row * .5);
+		var rowOffset = isOddRow ? 1 : -1;
+		return [
+			[bubble.col - 1, bubble.row], // left
+			[bubble.col + 1, bubble.row], // right
+			[bubble.col, bubble.row - 1], // top
+			[bubble.col, bubble.row + 1], // bottom
+			[bubble.col + rowOffset, bubble.row + 1], // other bottom
+			[bubble.col + rowOffset, bubble.row - 1], // other top
+		];
 	};
 
 });
